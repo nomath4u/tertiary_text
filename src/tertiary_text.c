@@ -19,6 +19,14 @@ TextLayer buttons2[3];
 TextLayer buttons3[3];
 TextLayer* bbuttons[] = {buttons1, buttons2, buttons3};
 
+//Set of enumerated keys with names and values corresponding android app keys for communication
+enum {
+  SELECT_KEY = 0x03,
+  UP_KEY = 0x01,
+  DOWN_KEY = 0x02,
+  DATA_KEY = 0x0
+};
+
 bool menu = false;
 
 // Here are the three cases, or sets
@@ -55,6 +63,10 @@ char* master = letters;
 char text_buffer[60];
 int pos = 0;
 int top, end, size;
+
+
+
+
 
 // This function changes the next case/symbol set.
 void change_set(int s, bool lock)
@@ -183,8 +195,65 @@ void select_long_click_handler(ClickRecognizerRef recognizer, Window *window) {
     else
          text_layer_set_background_color(&textLayer, GColorClear);
 
+    //Send select key to test app
+    
+    //Create a key-value pair
+    Tuplet value = TupletInteger(DATA_KEY, SELECT_KEY);
+  
+    //Construct the dictionary
+    DictionaryIterator *iter;
+    app_message_out_get(&iter);
+
+    //If it failed
+    if (iter == NULL){
+      return;
+    }
+
+    //Write to dictionary
+    dict_write_cstring(iter, DATA_KEY, text_buffer );
+    dict_write_end(iter);
+
+    //Send the dictionary and release the buffer
+    app_message_out_send();
+    app_message_out_release();
 }
 
+
+void out_sent_handler(DictionaryIterator *sent, void *context) {
+        //Notify the watch app user the send was successful
+  //text_layer_set_text(&textLayer, "Send successful!");
+}
+
+/**
+        * Handler for AppMessage send failed
+        */
+static void out_fail_handler(DictionaryIterator* failed, AppMessageResult reason, void* context) {
+        //Notify the watch app user that the send operation failed
+  //text_layer_set_text(&textLayer, "Send Failed");
+}
+
+/**
+        *       Handler for received AppMessage
+        */
+static void in_received_handler(DictionaryIterator* iter, void* context) {
+
+        //Create a tuple from the received dictionary using the key     
+  //Tuple *in_tuple = dict_find(iter, DATA_KEY);
+
+        //If the tuple was successfully obtained
+  //if (in_tuple)
+
+        //Show the recieved string on the watch!
+    //text_layer_set_text(&textLayer, in_tuple->value->cstring);
+}
+
+/**
+        * Handler for received message dropped
+        */
+void in_drop_handler(void *context, AppMessageResult reason) {
+        //Notify the watch app user that the recieved message was dropped
+      //  text_layer_set_text(&textLayer, "Message dropped!");
+}
 
 void down_long_click_handler(ClickRecognizerRef recognizer, Window *window) {
     (void)recognizer;
@@ -339,8 +408,23 @@ void handle_init(AppContextRef ctx) {
 
 void pbl_main(void *params) {
   PebbleAppHandlers handlers = {
-    .init_handler = &handle_init
-  };
+    .init_handler = &handle_init,
+
+    .messaging_info = {
+      //Buffer Size
+      .buffer_sizes = {
+        .inbound = 64,
+        .outbound = 16,
+      },
+
+      .default_callbacks.callbacks = {
+        .out_sent = out_sent_handler,
+        .out_failed = out_fail_handler,
+        .in_received = in_received_handler,
+        .in_dropped = in_drop_handler,
+      },
+   }
+   };
   change_set(1, true);
   next();
   app_event_loop(params, &handlers);
